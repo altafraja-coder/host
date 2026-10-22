@@ -1238,6 +1238,11 @@ async def error_handler(update, context):
 # ============================================================
 # 20. MAIN
 # ============================================================
+from aiohttp import web
+
+async def handle_ping(request):
+    return web.Response(text="Bot is running!")
+
 async def run_bot():
     if (not BOT_TOKEN or BOT_TOKEN == "PUT_YOUR_BOT_TOKEN_HERE"):
         raise RuntimeError("BOT_TOKEN missing hai. Render Environment Variables me BOT_TOKEN set karo.")
@@ -1248,13 +1253,26 @@ async def run_bot():
     app.add_handler(CallbackQueryHandler(verify_subscription, pattern="^verify_subscription$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
     app.add_error_handler(error_handler)
-    print("🤖 Bot starting...")
+    print("Bot starting...")
 
     await app.initialize()
     await app.start()
     try:
         await app.updater.start_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=False)
-        print("🤖 Bot started successfully...")
+        print("Bot started successfully...")
+
+        # --- Render Port Binding Dummy Web Server ---
+        web_app = web.Application()
+        web_app.router.add_get("/", handle_ping)
+        web_app.router.add_get("/health", handle_ping)
+
+        port = int(os.environ.get("PORT", 8080))
+        runner = web.AppRunner(web_app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", port)
+        await site.start()
+        print(f"Render web server running on port {port}")
+
         await asyncio.Event().wait()
     finally:
         try:
